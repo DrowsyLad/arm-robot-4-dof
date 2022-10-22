@@ -16,31 +16,42 @@ float a = 0, b = 0, c = 0, d = 0;
 float servo_1_current_angle = 0, servo_2_current_angle = 0, servo_3_current_angle = 0, servo_4_current_angle = 0;
 float servo_1_offset_angle = 90, servo_2_offset_angle = 105, servo_3_offset_angle = 120, servo_4_offset_angle = 0;
 
-
+const int servo_count = 4;
 
 enum servo_param{
   pin_pwm,
   deg_range,
   min_pwm,
   max_pwm,
+  max_to_min,
   param_count
 };
 
-int servo[4][param_count] = {
-  {10, 180, 540, 2400},
-  {9, 90, 540, 1600},
-  {6, 90, 540, 1600},
-  {7, 60, 540, 1500},
+int servo[servo_count][param_count] = {
+  {10,  180,  540,  2400,   0},   //servo 1, base
+  {9,   90,   750,  1650,   1},   //servo 2
+  {6,   80,   800,  1750,   1},   //servo 3
+  {7,   60,   540,  1200,   0},   //servo 4, gripper
 };
+
+Servo *servo_address[servo_count] = {&servo1, &servo2, &servo3, &servo4};
 
 void set_pwm(Servo *servo_target, int output_pwm){
   servo_target->writeMicroseconds(output_pwm);
 }
 
-void move_servo_pwm(float servo_1_target_angle, float servo_2_target_angle, float servo_3_target_angle, float servo_4_target_angle){
-  
+void move_servo_pwm(int servo_id, float target_angle){
+  --servo_id;
+  float deg_to_pwm = target_angle / servo[servo_id][deg_range] * (servo[servo_id][max_pwm] - servo[servo_id][min_pwm]);
+  int output;
+  if(servo[servo_id][max_to_min])
+    output = servo[servo_id][max_pwm] - round(deg_to_pwm);
+  else
+    output = round(deg_to_pwm) - servo[servo_id][min_pwm];
+  set_pwm(servo_address[servo_id], output);
 }
 
+//outdated
 void move_servo(float servo_1_target_angle, float servo_2_target_angle, float servo_3_target_angle, float servo_4_target_angle){
   int move_time = 1000; //in miliseconds
   int delay_per_steps = 10; //
@@ -66,64 +77,22 @@ void setup() {
   servo2.attach(9);
   servo3.attach(6);
   servo4.attach(7);
-  move_servo(0, 0, 0, 0);
+//  move_servo(0, 0, 0, 0);
 }
 
 void loop(){
-  // move_servo(0, 90, 90, 60);
-  // delay(2000);
+  move_servo_pwm(2, 0);
+  move_servo_pwm(3, 0);
+  delay(5000);
+  move_servo_pwm(2, 45);
+  move_servo_pwm(3, 45);
+  delay(5000);
+  move_servo_pwm(2, 90);
+  move_servo_pwm(3, 90);
+  delay(5000);
+  move_servo_pwm(2, 45);
+  move_servo_pwm(3, 45);
+  delay(5000);
   // move_servo(0, 0, 0, 0);
   // delay(2000);
-}
-
-void loop_(){ 
-//  set_pwm(&servo2, 750);
-  // move_servo(90, 0, 0, 0);
-  // for(int pwm = 540; pwm < 2400; pwm += 10){ //0->180
-  //   set_pwm(&servo1, pwm);
-  //   Serial.println(pwm);
-  //   delay(10);
-  // }
-  move_servo(90, 90, 90, 0);
-  // for(int pwm = 1600; pwm > 750; pwm -= 10){ //forward
-  //   set_pwm(&servo2, pwm);
-  //   Serial.println(pwm);
-  //   delay(10);
-  // }
-  move_servo(90, 90, 90, 60);
-  // for(int pwm = 540; pwm < 1200; pwm += 10){ //open
-  //   set_pwm(&servo4, pwm);
-  //   Serial.println(pwm);
-  //   delay(10);
-  // }
-  move_servo(-90, 0, 0, 60);
-  // for(int pwm = 750; pwm < 1600; pwm += 10){ //backward
-  //   set_pwm(&servo2, pwm);
-  //   Serial.println(pwm);
-  //   delay(10);
-  // }
-  // move_servo(-90, 0, 0, 60);
-  // for(int pwm = 2400; pwm > 540; pwm -= 10){ //180->0
-  //   set_pwm(&servo1, pwm);
-  //   Serial.println(pwm);
-  //   delay(10);
-  // }
-  move_servo(-90, 90, 90, 60);
-  // for(int pwm = 1600; pwm > 750; pwm -= 10){ //forward
-  //   set_pwm(&servo2, pwm);
-  //   Serial.println(pwm);
-  //   delay(10);
-  // }
-  move_servo(-90, 90, 90, 0);
-  // for(int pwm = 1200; pwm > 540; pwm -= 10){ //close
-  //   set_pwm(&servo4, pwm);
-  //   Serial.println(pwm);
-  //   delay(10);
-  // }
-  move_servo(90, 0, 0, 0);
-  // for(int pwm = 750; pwm < 1600; pwm += 10){ //backward
-  //   set_pwm(&servo2, pwm);
-  //   Serial.println(pwm);
-  //   delay(10);
-  // }
 }
