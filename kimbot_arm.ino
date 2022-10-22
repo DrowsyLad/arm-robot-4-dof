@@ -1,4 +1,5 @@
 #include <Servo.h>
+// using namespace servo_param;
 
 /*
  * Servo HS5055MG Sudut: 20-165
@@ -9,6 +10,7 @@ Servo servo1;
 Servo servo2;
 Servo servo3;
 Servo servo4;
+
 int angle = 0;
 float a = 0, b = 0, c = 0, d = 0;
 float servo_1_current_angle = 0, servo_2_current_angle = 0, servo_3_current_angle = 0, servo_4_current_angle = 0;
@@ -21,29 +23,15 @@ enum servo_param{
   deg_range,
   min_pwm,
   max_pwm,
+  param_count
 };
 
-int servo_[4][];
-
-servo[1][servo_param::pin_pwm] = 10;
-servo[1][servo_param::deg_range] = 180;
-servo[1][servo_param::min_pwm] = 540;
-servo[1][servo_param::max_pwm] = 2400;
-
-servo[2][servo_param::pin_pwm] = 9;
-servo[2][servo_param::deg_range] = 90;
-servo[2][servo_param::min_pwm] = 540;
-servo[2][servo_param::max_pwm] = 1600;
-
-servo[3][servo_param::pin_pwm] = 6;
-servo[3][servo_param::deg_range] = 90;
-servo[3][servo_param::min_pwm] = 540;
-servo[3][servo_param::max_pwm] = 1600;
-
-servo[4][servo_param::pin_pwm] = 7;
-servo[4][servo_param::deg_range] = 60;
-servo[4][servo_param::min_pwm] = 540;
-servo[4][servo_param::max_pwm] = 1500;
+int servo[4][param_count] = {
+  {10, 180, 540, 2400},
+  {9, 90, 540, 1600},
+  {6, 90, 540, 1600},
+  {7, 60, 540, 1500},
+};
 
 void set_pwm(Servo *servo_target, int output_pwm){
   servo_target->writeMicroseconds(output_pwm);
@@ -82,10 +70,10 @@ void setup() {
 }
 
 void loop(){
-  move_servo(0, 90, 90, 60);
-  delay(2000);
-  move_servo(0, 0, 0, 0);
-  delay(2000);
+  // move_servo(0, 90, 90, 60);
+  // delay(2000);
+  // move_servo(0, 0, 0, 0);
+  // delay(2000);
 }
 
 void loop_(){ 
