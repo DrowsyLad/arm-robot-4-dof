@@ -1,13 +1,28 @@
-#include <Servo.h>
+#include <ESP32_Servo.h> //Servo library for ESP32
+//#include <Servo.h> //Servo library for Arduino
+#include <BluetoothSerial.h>
 #include <math.h>
 
+//------------------------ Bluetooth Serial ----------------------------
+#if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
+#error Bluetooth is not enabled! Please run `make menuconfig` to and enable it
+#endif
+
+#if !defined(CONFIG_BT_SPP_ENABLED)
+#error Serial Bluetooth not available or not enabled. It is only available for the ESP32 chip.
+#endif
+
+BluetoothSerial SerialBT;
+//------------------------ Bluetooth Serial ----------------------------
+
+//--------------------------- Variables --------------------------------
 const float DEG2RAD = 0.017453292;
 const float RAD2DEG = 57.29578049;
 
-#define servo1_pin A0
-#define servo2_pin A1
-#define servo3_pin A2
-#define servo4_pin A3
+#define servo1_pin 12//23
+#define servo2_pin 13//22
+#define servo3_pin 14//21
+#define servo4_pin 19
 
 #define servo4_close 0
 #define servo4_open 60
@@ -27,6 +42,7 @@ float x=8, y=0, z=12;
 float global_angles[4] = {0,0,0,0};
 //running mode
 int global_mode = 0;
+int global_control_mode = 0;
 int standby_count;
 
 float x_axis, y_axis, z_axis;
@@ -34,6 +50,19 @@ float current_angle[4] = {0,0,0,0};
 float offset_angle[4] = {90,45,0,0};
 
 const int servo_count = 4;
+//--------------------------- Variables --------------------------------
+
+//--------------------------- Parameters -------------------------------
+enum global_params{
+  mode_Default,
+  mode_FK,
+  mode_IK,
+  mode_IK_Move_FK,
+  control_Bluetooth,
+  control_SerialMonitor,
+  control_Default,
+  global_param_count
+};
 
 enum servo_param{
   pin_pwm,
@@ -50,8 +79,20 @@ int servo[servo_count][param_count] = {
   {servo3_pin,   80,   800,  1750,   1},   //servo 3
   {servo4_pin,   60,   540,  1200,   0},   //servo 4, gripper
 };
+//--------------------------- Parameters -------------------------------
 
 Servo *servo_address[servo_count] = {&servo1, &servo2, &servo3, &servo4};
+
+void setup() {
+  Serial.begin(9600);
+  SerialBT.begin("ESP32test"); //Bluetooth device name
+  Serial.println("The device started, now you can pair it with bluetooth!");
+  servo1.attach(servo1_pin);
+  servo2.attach(servo2_pin);
+  servo3.attach(servo3_pin);
+  servo4.attach(servo4_pin);
+//  moveServo(0, 0, 0, 0);
+}
 
 void set_pwm(Servo *servo_target, int output_pwm){
   servo_target->writeMicroseconds(output_pwm);
@@ -114,6 +155,14 @@ void moveToPos(float x_input, float y_input, float z_input) {
     Serial.println(y_input);
     Serial.print("Z: ");
     Serial.println(z_input);
+
+    SerialBT.println("Input Coordinates:");
+    SerialBT.print("X: ");
+    SerialBT.println(x_input);
+    SerialBT.print("Y: ");
+    SerialBT.println(y_input);
+    SerialBT.print("Z: ");
+    SerialBT.println(z_input);
   }
   float target_angle[4] = {0,0,0,0};
 
@@ -130,12 +179,21 @@ void moveToPos(float x_input, float y_input, float z_input) {
     Serial.println(target_angle[1]);
     Serial.print("A3: ");
     Serial.println(target_angle[2]);
+
+    SerialBT.println("Predicted Angles:");
+    SerialBT.print("A1: ");
+    SerialBT.println(target_angle[0]);
+    SerialBT.print("A2: ");
+    SerialBT.println(target_angle[1]);
+    SerialBT.print("A3: ");
+    SerialBT.println(target_angle[2]);
   }
   target_angle[0] *= -1;
   target_angle[1] *= -1;
   target_angle[2] *= -1;
 //  target_angle[1] *= -1;
   forwardKinematics(&x_axis, &y_axis, &z_axis, target_angle, length);
+
   if(FK_debugPrint == true){
     Serial.println("Predicted Coordinates:");
     Serial.print("X: ");
@@ -144,6 +202,14 @@ void moveToPos(float x_input, float y_input, float z_input) {
     Serial.println(y_axis);
     Serial.print("Z: ");
     Serial.println(z_axis);
+
+    SerialBT.println("Predicted Coordinates:");
+    SerialBT.print("X: ");
+    SerialBT.println(x_axis);
+    SerialBT.print("Y: ");
+    SerialBT.println(y_axis);
+    SerialBT.print("Z: ");
+    SerialBT.println(z_axis);
   }
   // Serial.print("Phi: ");
   // Serial.println(phi);
@@ -230,15 +296,6 @@ void moveServo(float servo_1_target_angle, float servo_2_target_angle, float ser
   }
 }
 
-void setup() {
-  Serial.begin(9600);
-  servo1.attach(servo1_pin);
-  servo2.attach(servo2_pin);
-  servo3.attach(servo3_pin);
-  servo4.attach(servo4_pin);
-//  moveServo(0, 0, 0, 0);
-}
-
 void test_framework_2(){
   float angle_1[4] = {0, 0, 0, 0};
   moveAllServo_timed(100, angle_1);
@@ -293,6 +350,7 @@ void test_framework_3(){
 
 void testFK(float* target_angle){
   float length[3] = {4, 8, 8};
+
   Serial.print("Predicted Coordinates from : ");
   Serial.print(target_angle[0]);
   Serial.print(", ");
@@ -301,13 +359,31 @@ void testFK(float* target_angle){
   Serial.print(target_angle[2]);
   Serial.print(", ");
   Serial.println(target_angle[3]);
+
+  SerialBT.print("Predicted Coordinates from : ");
+  SerialBT.print(target_angle[0]);
+  SerialBT.print(", ");
+  SerialBT.print(target_angle[1]);
+  SerialBT.print(", ");
+  SerialBT.print(target_angle[2]);
+  SerialBT.print(", ");
+  SerialBT.println(target_angle[3]);
+
   forwardKinematics(&x_axis, &y_axis, &z_axis, target_angle, length);
+
   Serial.print("X: ");
   Serial.println(x_axis);
   Serial.print("Y: ");
   Serial.println(y_axis);
   Serial.print("Z: ");
   Serial.println(z_axis);
+
+  SerialBT.print("X: ");
+  SerialBT.println(x_axis);
+  SerialBT.print("Y: ");
+  SerialBT.println(y_axis);
+  SerialBT.print("Z: ");
+  SerialBT.println(z_axis);
 }
 
 void testIK(float x_input, float y_input, float z_input){
@@ -321,6 +397,14 @@ void testIK(float x_input, float y_input, float z_input){
   Serial.print("Z: ");
   Serial.println(z_input);
 
+  SerialBT.println("Input Coordinates:");
+  SerialBT.print("X: ");
+  SerialBT.println(x_input);
+  SerialBT.print("Y: ");
+  SerialBT.println(y_input);
+  SerialBT.print("Z: ");
+  SerialBT.println(z_input);
+
   inverseKinematics(target_angle, x_input, y_input, z_input);
   
   Serial.println("Predicted Angles:");
@@ -330,6 +414,14 @@ void testIK(float x_input, float y_input, float z_input){
   Serial.println(target_angle[1]);
   Serial.print("A3: ");
   Serial.println(target_angle[2]);
+
+  SerialBT.println("Predicted Angles:");
+  SerialBT.print("A1: ");
+  SerialBT.println(target_angle[0]);
+  SerialBT.print("A2: ");
+  SerialBT.println(target_angle[1]);
+  SerialBT.print("A3: ");
+  SerialBT.println(target_angle[2]);
 }
 
 void test_moveToPos(){
@@ -369,6 +461,12 @@ bool receiveXYZ(float* x, float* y, float* z){
     *z = Serial.parseInt();
     return true;
   }
+  if(SerialBT.available()){
+    *x = SerialBT.parseInt();
+    *y = SerialBT.parseInt();
+    *z = SerialBT.parseInt();
+    return true;
+  }
   else return false;
 }
 
@@ -376,6 +474,26 @@ bool receiveAngles(float* target_angle){
   if(Serial.available()){
     for(int servo_id = 0; servo_id < servo_count; ++servo_id)
       target_angle[servo_id] = Serial.parseInt();
+    return true;
+  }
+  if(SerialBT.available()){
+    for(int servo_id = 0; servo_id < servo_count; ++servo_id)
+      target_angle[servo_id] = SerialBT.parseInt();
+    return true;
+  }
+  else return false;
+}
+
+bool bluetoothController(float* x_input, float* y_input, float* z_input){
+  if(SerialBT.available()){
+    String BT_Button = SerialBT.readString();
+    if(BT_Button == "x+") *x_input += 1;
+    else if(BT_Button == "x-") *x_input -= 1;
+    else if(BT_Button == "y+") *y_input += 1;
+    else if(BT_Button == "y-") *y_input -= 1;
+    else if(BT_Button == "z+") *z_input += 1;
+    else if(BT_Button == "z-") *z_input -= 1;
+    
     return true;
   }
   else return false;
@@ -386,7 +504,19 @@ bool receiveMode(int* mode){
     *mode = Serial.parseInt();
     return true;
   }
+  if(SerialBT.available()){
+    *mode = SerialBT.parseInt();
+    return true;
+  }
   else return false;
+}
+
+void ESP32_Test(){
+  Serial.println("ESP32 test");
+  while (SerialBT.available()) {
+    Serial.write(SerialBT.read());
+    delay(20);
+  }
 }
 
 void loop(){
@@ -396,7 +526,14 @@ void loop(){
       Serial.println("Choose mode:");
       Serial.println("1. Forward Kinematics");
       Serial.println("2. Inverse Kinematics");
-      Serial.println("3. IK -> FK");
+      Serial.println("3. Move by Coords");
+      Serial.println("4. Bluetooth Controller");
+
+      SerialBT.println("Choose mode:");
+      SerialBT.println("1. Forward Kinematics");
+      SerialBT.println("2. Inverse Kinematics");
+      SerialBT.println("3. IK -> FK");
+      SerialBT.println("4. Bluetooth Controller");
     }
     break;
   
@@ -409,6 +546,7 @@ void loop(){
     }
     else{
       Serial.println("Forward Kinematics: A1, A2, A3, A4");
+      SerialBT.println("Forward Kinematics: A1, A2, A3, A4");
     }
     break;
   
@@ -418,6 +556,7 @@ void loop(){
     }
     else{
       Serial.println("Inverse Kinematics: X, Y, Z");
+      SerialBT.println("Inverse Kinematics: X, Y, Z");
     }
     break;
   
@@ -426,20 +565,25 @@ void loop(){
       moveToPos(x, y, z);
     else{
       Serial.println("Move to Coordinates: X, Y, Z");
+      SerialBT.println("Move to Coordinates: X, Y, Z");
+    }
+    break;
+
+  case 4:
+    if(bluetoothController(&x, &y, &z))
+      moveToPos(x, y, z);
+    else{
+      Serial.println("Bluetooth Controller: Waiting for input");
+      SerialBT.println("Bluetooth Controller: Waiting for input");
     }
     break;
   
   default:
     Serial.println("Mode not recognized");
+    SerialBT.println("Mode not recognized");
     global_mode = 0;
     break;
   }
-//  IK_debugPrint = false;
-//  TEST_debugPrint = false;
-//  FK_debugPrint = false;
 
-//  testIK();
   delay(1000);
-//  test_framework_3();
-//  return;
 }
